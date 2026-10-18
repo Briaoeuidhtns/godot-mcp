@@ -29,13 +29,15 @@ The server connects eagerly and assumes the editor may not be there yet:
 - **Reconnection** uses exponential backoff: 1s, 2s, 4s, 8s, 16s, then every 30s. You can start the server and the editor in either order.
 - **Heartbeats** go out every 30 seconds so the addon can tell a quiet-but-alive client from a dead one.
 
-### One client at a time
+### Client admission
 
-The editor bridge serves a single client. When a second client connects while one is active:
+By default the editor bridge serves one client at a time. When a second client connects while one is active:
 
-- The newcomer is rejected with WebSocket close code `4001` ("another client is already connected") instead of displacing the incumbent — a subagent that inherited your MCP config can't hijack your session mid-edit.
+- The newcomer is rejected with WebSocket close code `4001` ("another client is already connected") instead of displacing the incumbent.
 - Rejected clients retry with backoff and connect automatically once the slot frees up.
-- If the incumbent goes silent for **45 seconds** (no messages, no heartbeats) or its TCP connection drops, it's considered stale and the next client takes over. A crashed session never permanently wedges the bridge.
+- If the incumbent goes silent for **45 seconds** (no messages, no heartbeats) or its TCP connection drops, it's considered stale and the next client takes over.
+
+Set `godot_mcp/allow_multiple_clients=true` in Project Settings to admit concurrent clients. Responses, including async results, return only to the requesting socket. Turning the setting off stops new admissions without disconnecting existing clients. The status panel reports whether at least one client is connected.
 
 This logic lives in `godot/addons/godot_mcp/websocket_server.gd`.
 
@@ -79,7 +81,7 @@ server/src/connection/    WebSocket client to the editor addon
 server/src/installer/     --install-addon implementation
 godot/addons/godot_mcp/
   plugin.gd               EditorPlugin entry point; registers the autoload
-  websocket_server.gd     WebSocket listener + single-client policy
+  websocket_server.gd     WebSocket listener + configurable client admission
   command_router.gd       Routes commands to handlers
   commands/               GDScript command handlers (one file per domain)
   core/                   Debugger plugin, logger, shared utilities

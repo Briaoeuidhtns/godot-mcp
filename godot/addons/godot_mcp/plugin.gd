@@ -85,6 +85,13 @@ func _ensure_bind_settings() -> void:
 		ProjectSettings.set_setting(SETTING_PORT_OVERRIDE_ENABLED, false)
 	if not ProjectSettings.has_setting(SETTING_PORT_OVERRIDE):
 		ProjectSettings.set_setting(SETTING_PORT_OVERRIDE, WebSocketServer.DEFAULT_PORT)
+	if not ProjectSettings.has_setting(WebSocketServer.SETTING_ALLOW_MULTIPLE_CLIENTS):
+		ProjectSettings.set_setting(WebSocketServer.SETTING_ALLOW_MULTIPLE_CLIENTS, false)
+	ProjectSettings.set_initial_value(WebSocketServer.SETTING_ALLOW_MULTIPLE_CLIENTS, false)
+	ProjectSettings.add_property_info({
+		"name": WebSocketServer.SETTING_ALLOW_MULTIPLE_CLIENTS,
+		"type": TYPE_BOOL,
+	})
 	ProjectSettings.save()
 
 
@@ -258,15 +265,17 @@ func get_debugger_plugin() -> MCPDebuggerPlugin:
 	return _debugger_plugin
 
 
-func _on_command_received(id: String, command: String, params: Dictionary) -> void:
+func _on_command_received(client: WebSocketPeer, id: String, command: String, params: Dictionary) -> void:
 	var response = await _command_router.handle_command(command, params)
 	response["id"] = id
-	_websocket_server.send_response(response)
+	_websocket_server.send_response(response, client)
 
 
 func _on_client_connected() -> void:
 	var host_info := ""
-	if _websocket_server.get_connected_host():
+	if ProjectSettings.get_setting(WebSocketServer.SETTING_ALLOW_MULTIPLE_CLIENTS, false):
+		host_info = " (multi-client mode)"
+	elif _websocket_server.get_connected_host():
 		host_info = " from %s:%d" % [_websocket_server.get_connected_host(), _websocket_server.get_connected_port()]
 	var bind_info := "(%s: %s:%d)" % [MCPEnums.get_mode_name(_current_bind_mode), _current_bind_address, _get_listen_port()]
 	_update_status("Connected%s %s" % [host_info, bind_info])

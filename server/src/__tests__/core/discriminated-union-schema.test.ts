@@ -13,12 +13,15 @@ const actionEnumOf = (schema: JsonSchema): string[] =>
   ((schema.properties as JsonSchema).action as JsonSchema).enum as string[];
 
 describe('discriminated-union tool schemas', () => {
-  it('serialize to a flat object schema with an action enum', () => {
+  it('publishes node property metadata as a valid read action', () => {
     const schema = schemaOf(nodeRead);
     expect(schema.type).toBe('object');
-    const actions = actionEnumOf(schema);
-    expect(Array.isArray(actions)).toBe(true);
-    expect(actions).toEqual(['get_properties', 'get_scene_tree', 'find']);
+    expect(actionEnumOf(schema)).toContain('get_property_metadata');
+    expect(nodeRead.schema.safeParse({ action: 'get_property_metadata' }).success).toBe(false);
+    expect(nodeRead.schema.safeParse({
+      action: 'get_property_metadata',
+      node_path: '/root/Scene/Node',
+    }).success).toBe(true);
   });
 
   it('keep fields required by every branch as top-level required', () => {

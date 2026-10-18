@@ -11,6 +11,7 @@ var _find_nodes_result: Dictionary = {}
 func get_commands() -> Dictionary:
 	return {
 		"get_node_properties": get_node_properties,
+		"get_node_property_metadata": get_node_property_metadata,
 		"find_nodes": find_nodes,
 		"update_node": update_node,
 		"reparent_node": reparent_node
@@ -28,15 +29,46 @@ func get_node_properties(params: Dictionary) -> Dictionary:
 
 	var properties := {}
 	for prop in node.get_property_list():
+		if not _include_property(prop):
+			continue
 		var name: String = prop["name"]
-		if name.begins_with("_") or prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
-			if prop["usage"] & PROPERTY_USAGE_EDITOR == 0:
-				continue
-
 		var value = node.get(name)
 		properties[name] = _serialize_value(value)
 
 	return _success({"properties": properties})
+
+func get_node_property_metadata(params: Dictionary) -> Dictionary:
+	var node_path: String = params.get("node_path", "")
+	if node_path.is_empty():
+		return _error("INVALID_PARAMS", "node_path is required")
+
+	var node := _get_node(node_path)
+	if not node:
+		return _error("NODE_NOT_FOUND", "Node not found: %s" % node_path)
+
+	var properties := {}
+	for prop in node.get_property_list():
+		if prop["usage"] & (PROPERTY_USAGE_STORAGE | PROPERTY_USAGE_EDITOR) == 0:
+			continue
+		var usage: int = prop["usage"]
+		properties[prop["name"]] = {
+			"type": prop["type"],
+			"hint": prop["hint"],
+			"hint_string": prop["hint_string"],
+			"class_name": str(prop.get("class_name", "")),
+			"usage": usage,
+			"storage": bool(usage & PROPERTY_USAGE_STORAGE),
+			"editor": bool(usage & PROPERTY_USAGE_EDITOR),
+			"read_only": bool(usage & PROPERTY_USAGE_READ_ONLY),
+		}
+	return _success({"properties": properties})
+
+
+func _include_property(prop: Dictionary) -> bool:
+	var name: String = prop["name"]
+	if name.begins_with("_") or prop["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
+		return prop["usage"] & PROPERTY_USAGE_EDITOR != 0
+	return true
 
 
 func find_nodes(params: Dictionary) -> Dictionary:

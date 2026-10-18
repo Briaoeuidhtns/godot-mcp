@@ -6,7 +6,13 @@ import type { AnyToolDefinition } from '../core/types.js';
 const NodeReadSchema = z
   .discriminatedUnion('action', [
     z.object({
-      action: z.literal('get_properties').describe('Get a node\'s properties'),
+      action: z.literal('get_properties').describe('Get a node\'s effective property values (not a list of serializable .tscn fields)'),
+      node_path: z.string().describe('Path to the node'),
+    }),
+    z.object({
+      action: z.literal('get_property_metadata').describe(
+        'Get property type, hint, usage flags, and storage/editor/read-only indicators. Inspect before editing a .tscn: an Inspector-visible property can be editor-only and must not be written into a scene file. STORAGE marks serialization eligibility, not a promise that a setter is safe or that this particular scene will save the property.'
+      ),
       node_path: z.string().describe('Path to the node'),
     }),
     z.object({
@@ -82,7 +88,7 @@ export const nodeRead = defineTool({
     openWorldHint: false,
   },
   description:
-    'Inspect scene nodes in the editor: read a node\'s effective properties (including class defaults a .tscn read cannot show), view the full scene tree as the editor sees it (including children inside instanced sub-scenes), and find nodes by name or type. Use it to discover node paths and verify the live state of the open scene before or after making changes. It cannot modify anything; to update properties or reparent a node, use godot_node_edit.',
+    'Inspect scene nodes in the editor: read effective property values and separate property metadata (including STORAGE versus EDITOR usage), view the scene tree, or find nodes. Values may include editor-only properties that cannot be serialized into a .tscn; use get_property_metadata before editing scene files. It cannot modify anything; to update properties or reparent a node in the editor, use godot_node_edit.',
   schema: NodeReadSchema,
   async execute(args: NodeReadArgs, { godot }) {
     switch (args.action) {
@@ -93,6 +99,15 @@ export const nodeRead = defineTool({
         return structured(result.properties);
       }
 
+      case 'get_property_metadata': {
+        const result = await godot.sendCommand<{
+          properties: Record<string, {
+            type: number; hint: number; hint_string: string; class_name: string;
+            usage: number; storage: boolean; editor: boolean; read_only: boolean;
+          }>;
+        }>('get_node_property_metadata', { node_path: args.node_path });
+        return structured(result.properties);
+      }
       case 'get_scene_tree': {
         const result = await godot.sendCommand<{ tree: unknown }>('get_scene_tree', {
           max_depth: args.max_depth,
@@ -130,7 +145,7 @@ export const nodeEdit = defineTool({
     openWorldHint: false,
   },
   description:
-    'Modify scene nodes in the editor: update a node\'s properties, or reparent it (the editor rewrites child paths and signal connections correctly; hand-editing .tscn for a reparent does not). Use it to change existing nodes in the open scene. To inspect properties, the scene tree, or search for nodes, use godot_node_read; to add or remove nodes, or attach scripts and connect signals, edit the .tscn file directly, then verify with godot_node_read\'s get_scene_tree.',
+    'Modify scene nodes in the editor: update a node\'s properties, or reparent it (the editor rewrites child paths and signal connections correctly; hand-editing .tscn for a reparent does not). For file-first property edits, inspect godot_node_read get_property_metadata: only STORAGE properties are eligible for serialization, and editor-visible values alone are not evidence of that; STORAGE does not guarantee setter safety or a saved override. Editor-only properties may instead be changed live with update when the editor supports them. To add or remove nodes, or attach scripts and connect signals, edit the .tscn file directly, then verify with godot_node_read.',
   schema: NodeEditSchema,
   async execute(args: NodeEditArgs, { godot }) {
     switch (args.action) {

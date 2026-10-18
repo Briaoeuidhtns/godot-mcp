@@ -36,7 +36,7 @@ export const scene = defineTool({
   name: 'godot_scene',
   annotations: { title: 'Scene', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   description:
-    'Manage scenes in the editor: open a scene, save the open scene, or reload an open scene from disk after you edit its .tscn directly (so the editor picks up the change without a full restart). To create a new scene, write the .tscn file directly — header [gd_scene format=3] without a uid (the editor assigns one when it imports the file), then one [node name="X" type="Node2D"] block per node — and open it with this tool.',
+    'Manage scenes in the editor: open, save, or reload an open scene after editing its .tscn directly. Before writing node properties into a .tscn, inspect godot_node_read get_property_metadata: Inspector-visible values may be EDITOR-only, not STORAGE, and even STORAGE does not guarantee a setter is safe at scene-load time. Editor-only settings may require a live godot_node_edit update instead. Reload discards unsaved editor changes and invokes scene-load setters. To create a new scene, write the .tscn file directly — header [gd_scene format=3] without a uid (the editor assigns one when it imports the file), then one [node name="X" type="Node2D"] block per node — and open it with this tool.',
   schema: SceneSchema,
   async execute(args: SceneArgs, { godot }) {
     switch (args.action) {

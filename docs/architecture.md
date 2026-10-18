@@ -41,6 +41,12 @@ Set `godot_mcp/allow_multiple_clients=true` in Project Settings to admit concurr
 
 This logic lives in `godot/addons/godot_mcp/websocket_server.gd`.
 
+## Node property metadata and scene files
+
+`godot_node_read` with `action: "get_properties"` returns effective values; it does **not** identify what belongs in a `.tscn`. Use `action: "get_property_metadata"` on the same `node_path` to obtain a separate map keyed by property name: Godot Variant `type`, property `hint` and `hint_string`, `class_name`, raw `usage` flags, and booleans `storage`, `editor`, and `read_only`. `storage` corresponds to `PROPERTY_USAGE_STORAGE`, `editor` to `PROPERTY_USAGE_EDITOR`; an Inspector-visible editor-only property must not be copied into a scene file. The metadata action does not change the shape of the values action.
+
+For file-first edits, inspect the target property's metadata and only consider STORAGE fields for serialization. STORAGE indicates eligibility, **not** that a value must be explicitly written (defaults, ownership, and resource overrides affect saves), nor that assigning it is safe: setters can depend on initialization order and external resources. `read_only` reflects Godot's usage flag, not an exhaustive setter guarantee. Use `godot_node_edit update` for supported live editor-only operations, and check the result in the editor. Reloading a `.tscn` invokes scene-load setters and discards unsaved editor changes.
+
 ## Deterministic game time
 
 `godot_editor_edit run frozen=true` boots the game with the clock frozen from frame 0, and `godot_game_time` owns the clock from there:

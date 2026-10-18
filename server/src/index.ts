@@ -71,6 +71,9 @@ export async function main(deps: MainDeps = {}) {
         'screenshots, profiler data, and editor logs. Reach for godot_* tools whenever a ' +
         'task touches a Godot project; all godot_*_read tools are safe to auto-allow. ' +
         'Requires the editor to be open with the godot-mcp addon enabled. ' +
+        'Before writing node properties into .tscn files, check godot_node_read ' +
+        'get_property_metadata: Inspector visibility does not imply STORAGE usage, ' +
+        'and STORAGE does not guarantee setter safety. ' +
         'Godot pitfalls that produce no errors: ' +
         '(1) If 3D rendering looks wrong with nothing in any log (black/too-dark surfaces, ' +
         'invisible or one-sided walls/floors, lighting that ignores light changes), run ' +

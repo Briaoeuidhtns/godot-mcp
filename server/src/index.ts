@@ -8,6 +8,7 @@ import {
 
 import { initializeConnection, getGodotConnection } from './connection/websocket.js';
 import { registry } from './core/registry.js';
+import { ExtensionTools } from './core/extensions.js';
 import { isStructuredResult } from './core/structured.js';
 import { registerAllTools } from './tools/index.js';
 import { GodotCommandError } from './utils/errors.js';
@@ -49,7 +50,7 @@ export async function main(deps: MainDeps = {}) {
     },
     {
       capabilities: {
-        tools: {},
+        tools: { listChanged: true },
       },
       // Injected into the client's context at connect time. With tool search
       // deferring schemas, this is the primary session-start surface: lead
@@ -94,9 +95,10 @@ export async function main(deps: MainDeps = {}) {
             'editor never re-reads it); restart to apply changed autoloads/input map.'),
     }
   );
+  const extensions = new ExtensionTools(getGodotConnection(), server, readOnly);
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return { tools: registry.getToolList() };
+    return { tools: [...registry.getToolList(), ...extensions.list()] };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -104,7 +106,9 @@ export async function main(deps: MainDeps = {}) {
     const godot = getGodotConnection();
 
     try {
-      const result = await registry.executeTool(name, args ?? {}, { godot });
+      const result = extensions.has(name)
+        ? JSON.stringify(await extensions.call(name, args ?? {}))
+        : await registry.executeTool(name, args ?? {}, { godot });
       if (typeof result === 'string') {
         return {
           content: [{ type: 'text', text: result }],
@@ -142,9 +146,8 @@ export async function main(deps: MainDeps = {}) {
     }
   });
 
-  // Connect the MCP transport FIRST, before touching Godot. The tool list is
-  // already registered above and does not depend on Godot being reachable, so
-  // the client's initialize + tools/list exchange must complete immediately.
+  // Keep the stdio handshake independent of the editor connection. Extension
+  // discovery runs on each Godot connect and notifies clients to refresh tools.
   // Awaiting the Godot connection here instead (the old order) coupled the MCP
   // handshake to the WebSocket connect: when Godot is unreachable in a way that
   // does not fail fast — e.g. a WSL2 client hitting a Windows host whose

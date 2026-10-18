@@ -71,6 +71,7 @@ func _exit_tree() -> void:
 		_debugger_plugin = null
 
 	if _command_router:
+		_command_router.shutdown()
 		_command_router = null  # RefCounted - freed automatically
 
 	MCPLog.info("Plugin disabled")

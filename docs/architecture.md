@@ -60,6 +60,22 @@ The standard cross-boundary setup is Godot on Windows with the MCP server inside
 - **Host discovery** (`server/src/utils/host-ip-resolver.ts`): on WSL2 the Windows host IP comes from the nameserver in `/etc/resolv.conf`; on WSL1 it's the default gateway from `/proc/net/route`. `GODOT_HOST` overrides everything.
 - **Bind modes** (MCP panel in the editor): the addon defaults to `127.0.0.1`, which WSL traffic can't reach — switch to **WSL** mode to listen on the `vEthernet (WSL)` interface, or **Custom** for any specific IP. Panel settings persist to `project.godot`.
 
+## Editor extensions
+
+Projects can register editor-side providers in the `godot_mcp/extensions` Project Setting as a `PackedStringArray` of `res://` script paths. Each script must instantiate a `RefCounted` with `setup(plugin: EditorPlugin)`, `get_extension_id() -> String`, and `get_tools() -> Dictionary`; an optional `shutdown()` runs when the addon unloads or registration fails. For example, a provider can return:
+
+```gdscript
+{
+    "godot_my_project_read": {
+        "description": "Inspect project-specific state",
+        "inputSchema": {"type": "object", "properties": {}},
+        "handler": _read_state
+    }
+}
+```
+
+Handlers receive an argument Dictionary and return a Dictionary (or `{"error": "message"}`). Tool names must start with `godot_`; duplicate IDs, conflicting names, or invalid definitions reject the whole provider. The server discovers providers on connection, clears them on disconnect, and refreshes the MCP tool list after reconnection. In `GODOT_MCP_READ_ONLY` mode it exposes **no** extension tools: provider descriptions cannot prove their handlers are read-only. Extensions run in the editor with the same privileges as the addon; load only trusted scripts.
+
 ## Security posture
 
 - The addon binds to **localhost by default**; the WebSocket is unencrypted (`ws://`). The other bind modes exist for WSL and trusted-LAN setups — don't point them at interfaces you don't trust.
